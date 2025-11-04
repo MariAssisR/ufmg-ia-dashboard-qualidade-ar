@@ -1,11 +1,15 @@
 import os
 import httpx
 import asyncio
+import csv
+from pathlib import Path
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, HTTPException, Query
 from pydantic import BaseModel, Field
 from datetime import datetime, timedelta, timezone
 from dotenv import load_dotenv
 from typing import List, Optional, Any, Dict
+from apscheduler.schedulers.background import BackgroundScheduler
 
 # Carrega as variáveis de ambiente
 load_dotenv()
@@ -49,22 +53,137 @@ class StateResponse(BaseModel):
 class CityResponse(BaseModel):
   city: str
 
+# --- Configuração do CSV ---
+CSV_FILE = Path("dados_qualidade_ar.csv")
+CSV_HEADERS = ["timestamp", "city", "state", "country", "pm25", "temperature", "humidity", "aqi"]
+
+def save_to_csv(data: dict):
+  """Salva dados no CSV"""
+  file_exists = CSV_FILE.exists()
+  
+  with open(CSV_FILE, 'a', newline='', encoding='utf-8') as f:
+    writer = csv.DictWriter(f, fieldnames=CSV_HEADERS)
+    if not file_exists:
+      writer.writeheader()
+    writer.writerow(data)
+
+def read_from_csv(city: str = None, hours: int = 24):
+  """Lê dados do CSV"""
+  if not CSV_FILE.exists():
+    return []
+  
+  cutoff_time = datetime.now(timezone.utc) - timedelta(hours=hours)
+  results = []
+  
+  with open(CSV_FILE, 'r', encoding='utf-8') as f:
+    reader = csv.DictReader(f)
+    for row in reader:
+      try:
+        row_time = datetime.fromisoformat(row['timestamp'].replace('Z', '+00:00'))
+        if row_time >= cutoff_time:
+          if city is None or row['city'].lower() == city.lower():
+            results.append(row)
+      except:
+        continue
+  
+  return results
+
+# Lista de cidades para coletar
+CITIES_TO_COLLECT = [
+  {"city": "São Paulo", "state": "São Paulo", "country": "Brazil"},
+  {"city": "Rio de Janeiro", "state": "Rio de Janeiro", "country": "Brazil"},
+  {"city": "Curitiba", "state": "Parana", "country": "Brazil"},
+]
+
+async def collect_data_for_all_cities():
+  """Coleta dados de todas as cidades e salva no CSV"""
+  print(f"🔄 [{datetime.now().strftime('%H:%M:%S')}] Iniciando coleta automática...")
+  
+  async with httpx.AsyncClient(timeout=30.0) as client:
+    for city_info in CITIES_TO_COLLECT:
+      try:
+        # Coleta dados do IQAir (mesma lógica do endpoint /current)
+        params = {
+          **IQAIR_PARAMS, 
+          "city": city_info["city"], 
+          "state": city_info["state"], 
+          "country": city_info["country"]
+        }
+        
+        response = await client.get(f"{IQAIR_API_URL}city", params=params)
+        response.raise_for_status()
+        data = response.json()
+        
+        if data.get("status") == "success":
+          current_data = data.get("data", {}).get("current", {})
+          weather = current_data.get("weather", {})
+          pollution = current_data.get("pollution", {})
+          
+          # AQI US é o valor padrão retornado pela IQAir
+          pm25_value = pollution.get("aqius")
+          
+          # Prepara dados para CSV
+          csv_data = {
+            "timestamp": weather.get("ts", datetime.now(timezone.utc).isoformat()),
+            "city": city_info["city"],
+            "state": city_info["state"],
+            "country": city_info["country"],
+            "pm25": pm25_value if pm25_value is not None else "",
+            "temperature": weather.get("tp", ""),
+            "humidity": weather.get("hu", ""),
+            "aqi": pollution.get("aqius", "")
+          }
+          
+          save_to_csv(csv_data)
+          print(f"✅ {city_info['city']}: AQI={csv_data['aqi']}, Temp={csv_data['temperature']}°C")
+        else:
+          print(f"⚠️  {city_info['city']}: Dados não disponíveis")
+          
+      except Exception as e:
+        print(f"❌ Erro ao coletar {city_info['city']}: {e}")
+      
+      await asyncio.sleep(1)  # Evita rate limit
+  
+  print(f"✅ Coleta concluída!\n")
+
+def scheduled_collection():
+  """Função para o scheduler (síncrona)"""
+  asyncio.run(collect_data_for_all_cities())
+
+# --- Lifespan: Gerencia startup e shutdown ---
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+  """Gerencia o ciclo de vida da aplicação (startup e shutdown)"""
+  # --- STARTUP ---
+  timeout = httpx.Timeout(30.0, connect=5.0)
+  app.state.http_client = httpx.AsyncClient(timeout=timeout)
+  
+  # Inicia o scheduler para coletar a cada 5 minutos
+  scheduler = BackgroundScheduler()
+  scheduler.add_job(scheduled_collection, 'interval', minutes=5, id='collect_data')
+  scheduler.start()
+  app.state.scheduler = scheduler
+  
+  # Coleta inicial
+  await collect_data_for_all_cities()
+  
+  print("✅ Scheduler iniciado! Coletando a cada 5 minutos...")
+  
+  yield  # Aplicação roda aqui
+  
+  # --- SHUTDOWN ---
+  await app.state.http_client.aclose()
+  if hasattr(app.state, 'scheduler'):
+    app.state.scheduler.shutdown()
+  print("🛑 Servidor encerrado")
+
 # --- Inicialização do FastAPI ---
 app = FastAPI(
   title="API Híbrida de Qualidade do Ar",
   description="IQAir para dados atuais + OpenWeatherMap para histórico 24h",
-  version="2.0"
+  version="2.0",
+  lifespan=lifespan
 )
-
-# --- Gerenciamento do Cliente HTTP ---
-@app.on_event("startup")
-async def startup_event():
-  timeout = httpx.Timeout(30.0, connect=5.0)
-  app.state.http_client = httpx.AsyncClient(timeout=timeout)
-
-@app.on_event("shutdown")
-async def shutdown_event():
-  await app.state.http_client.aclose()
 
 # --- Funções Auxiliares ---
 
@@ -238,6 +357,7 @@ async def get_current_data(
 ):
   """
   Busca dados atuais de PM2.5, Temperatura e Umidade via IQAir.
+  Também salva os dados no CSV para histórico.
   """
   client = request.app.state.http_client
   params = {**IQAIR_PARAMS, "city": city, "state": state, "country": country}
@@ -256,10 +376,32 @@ async def get_current_data(
     current_data = data.get("data", {}).get("current", {})
     weather = current_data.get("weather", {})
     pollution = current_data.get("pollution", {})
-    pm25_data = pollution.get("p2", {}).get("conc")
+    
+    # PM2.5 está em pollution.aqius (AQI US) ou pollution.p2 (concentração)
+    # Estrutura correta da IQAir: pollution = {"ts": "...", "aqius": 45, "mainus": "p2", "aqicn": 30, "maincn": "p2"}
+    # Para concentração de PM2.5, não está diretamente disponível na resposta do /city
+    # Vamos usar o AQI como referência principal
+    pm25_value = pollution.get("aqius")  # AQI US padrão
+    
+    # Debug: imprime a estrutura completa em caso de erro
+    if pm25_value is None:
+      print(f"⚠️  DEBUG - Estrutura pollution: {pollution}")
+
+    # Salva no CSV para histórico
+    csv_data = {
+      "timestamp": weather.get("ts", datetime.now(timezone.utc).isoformat()),
+      "city": city,
+      "state": state,
+      "country": country,
+      "pm25": pm25_value if pm25_value is not None else "",
+      "temperature": weather.get("tp", ""),
+      "humidity": weather.get("hu", ""),
+      "aqi": pollution.get("aqius", "")
+    }
+    save_to_csv(csv_data)
 
     return CurrentDataResponse(
-      pm25=pm25_data,
+      pm25=pm25_value,
       temperature=weather.get("tp"),
       humidity=weather.get("hu"),
       timestamp=weather.get("ts"),
@@ -356,6 +498,68 @@ async def geocode_city(
     )
 
   return coords
+
+@app.get("/debug/raw/{city}", summary="[DEBUG] Ver resposta completa da API IQAir")
+async def debug_iqair_response(
+    city: str,
+    state: str = Query(..., description="Nome do estado"),
+    country: str = Query(..., description="Nome do país"),
+    request: Request = None
+):
+  """
+  Endpoint de debug para ver a estrutura completa da resposta da IQAir.
+  Use para entender como os dados são retornados.
+  """
+  client = request.app.state.http_client
+  params = {**IQAIR_PARAMS, "city": city, "state": state, "country": country}
+  
+  try:
+    response = await client.get(f"{IQAIR_API_URL}city", params=params)
+    response.raise_for_status()
+    data = response.json()
+    return data  # Retorna a resposta completa, sem processamento
+  except Exception as e:
+    return {"error": str(e)}
+
+@app.get("/cities/{city}/history", summary="Histórico coletado automaticamente (CSV)")
+async def get_history_from_csv(
+    city: str,
+    hours: int = Query(24, description="Últimas X horas de dados (padrão: 24h)")
+):
+  """
+  Retorna dados históricos coletados automaticamente pelo scheduler.
+  Os dados são salvos a cada 5 minutos no arquivo CSV.
+  """
+  data = read_from_csv(city=city, hours=hours)
+  
+  if not data:
+    raise HTTPException(
+      status_code=404,
+      detail=f"Nenhum dado encontrado para '{city}' nas últimas {hours} horas"
+    )
+  
+  return {
+    "city": city,
+    "hours": hours,
+    "total_records": len(data),
+    "data": data
+  }
+
+@app.get("/history/all", summary="Todo histórico coletado (todas as cidades)")
+async def get_all_history(
+    hours: int = Query(24, description="Últimas X horas de dados (padrão: 24h)")
+):
+  """
+  Retorna todos os dados coletados de todas as cidades.
+  """
+  data = read_from_csv(city=None, hours=hours)
+  
+  return {
+    "hours": hours,
+    "total_records": len(data),
+    "cities": list(set([row['city'] for row in data])),
+    "data": data
+  }
 
 if __name__ == "__main__":
   import uvicorn

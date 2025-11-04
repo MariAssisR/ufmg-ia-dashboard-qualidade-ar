@@ -1,0 +1,8 @@
+venv/
+__pycache__/
+*.pyc
+.env
+dados_qualidade_ar.csv
+test_dados_qualidade_ar.csv
+.pytest_cache/
+
