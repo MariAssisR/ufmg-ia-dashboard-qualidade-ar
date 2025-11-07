@@ -10,6 +10,7 @@ from datetime import datetime, timedelta, timezone
 from dotenv import load_dotenv
 from typing import List, Optional, Any, Dict
 from apscheduler.schedulers.background import BackgroundScheduler
+from fastapi.middleware.cors import CORSMiddleware
 
 # Carrega as variáveis de ambiente
 load_dotenv()
@@ -183,6 +184,15 @@ app = FastAPI(
   description="IQAir para dados atuais + OpenWeatherMap para histórico 24h",
   version="2.0",
   lifespan=lifespan
+)
+
+# Adiciona CORS para liberar acesso ao frontend
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # --- Funções Auxiliares ---

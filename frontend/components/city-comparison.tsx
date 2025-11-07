@@ -1,22 +1,50 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import { Card } from "@/components/ui/card"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts"
+import { getAllHistory } from "../lib/api"
 
 interface CityComparisonProps {
   currentCity: string
 }
 
 export function CityComparison({ currentCity }: CityComparisonProps) {
-  // Simulated data - replace with actual API call
-  const comparisonData = [
-    { city: "São Paulo", pm25: 45, color: "hsl(var(--warning))" },
-    { city: "Rio de Janeiro", pm25: 32, color: "hsl(var(--warning))" },
-    { city: "Belo Horizonte", pm25: 28, color: "hsl(var(--warning))" },
-    { city: "Brasília", pm25: 18, color: "hsl(var(--success))" },
-    { city: "Curitiba", pm25: 22, color: "hsl(var(--success))" },
-    { city: "Porto Alegre", pm25: 38, color: "hsl(var(--warning))" },
-  ]
+  const [comparisonData, setComparisonData] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string|null>(null)
+
+  useEffect(() => {
+    setLoading(true)
+    setError(null)
+    getAllHistory(1) // busca dados da última hora para dados "atuais"
+      .then((data) => {
+        // Agrupa por cidade e pega o último registro de cada uma
+        const cityGroups: Record<string, any[]> = {}
+        if (!data.data) return setError('Dados não disponíveis no backend!')
+        data.data.forEach((item: any) => {
+          if (!cityGroups[item.city]) cityGroups[item.city] = []
+          cityGroups[item.city].push(item)
+        })
+        const lastByCity = Object.entries(cityGroups).map(([city, group]) => {
+          const last = group[group.length - 1]
+          return {
+            city,
+            pm25: Number(last.pm25),
+            color: Number(last.pm25) <= 20 ? "hsl(var(--success))" : "hsl(var(--warning))"
+          }
+        })
+        setComparisonData(lastByCity)
+        setLoading(false)
+      })
+      .catch((err) => {
+        setError('Erro ao carregar dados das cidades: '+err)
+        setLoading(false)
+      })
+  }, [])
+
+  if(loading) return <Card className="p-6">Carregando comparação entre cidades...</Card>
+  if(error) return <Card className="p-6 text-red-600">{error}</Card>
 
   return (
     <Card className="p-6">
