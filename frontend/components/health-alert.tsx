@@ -1,9 +1,7 @@
 "use client"
 
-import { useEffect, useState } from "react"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { AlertTriangle, CheckCircle, AlertCircle } from "lucide-react"
-import { getCurrentCityData } from "../lib/api"
 
 interface HealthAlertProps {
   data: {
@@ -11,23 +9,7 @@ interface HealthAlertProps {
   }
 }
 
-export function HealthAlert({ data: _data }: HealthAlertProps) {
-  const [data, setData] = useState(_data)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string|null>(null)
-
-  useEffect(() => {
-    if (_data) return
-    setLoading(true)
-    getCurrentCityData("São Paulo", "São Paulo", "Brazil")
-      .then(res => { setData(res); setLoading(false) })
-      .catch(err => { setError("Erro ao buscar alerta de saúde: "+err); setLoading(false) })
-  }, [])
-
-  if (loading) return <div>Carregando alerta de saúde...</div>
-  if (error) return <div className="text-red-600">{error}</div>
-  if (!data) return null
-
+export function HealthAlert({ data }: HealthAlertProps) {
   const getAlertInfo = (pm25: number) => {
     if (pm25 <= 12) {
       return {

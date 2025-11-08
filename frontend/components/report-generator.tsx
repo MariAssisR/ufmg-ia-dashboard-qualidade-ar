@@ -4,28 +4,25 @@ import { useState } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { FileText, Download } from "lucide-react"
-import { getCurrentCityData, getCityHistory } from "../lib/api"
 
 interface ReportGeneratorProps {
   city: string
   data: any
 }
 
-export function ReportGenerator({ city }: ReportGeneratorProps) {
+export function ReportGenerator({ city, data }: ReportGeneratorProps) {
   const [generating, setGenerating] = useState(false)
   const [report, setReport] = useState<string | null>(null)
-  const [error, setError] = useState<string|null>(null)
 
   const generateReport = async () => {
     setGenerating(true)
-    setError(null)
-    try {
-      const current = await getCurrentCityData(city, "", "Brazil")
-      const historicalResp = await getCityHistory(city, 24)
-      const historical = historicalResp.data || []
-      const pm25 = current.pm25
+
+    // Simulating report generation - replace with actual backend call
+    setTimeout(() => {
+      const pm25 = data.current.pm25
       const quality =
         pm25 <= 12 ? "boa" : pm25 <= 35 ? "moderada" : pm25 <= 55 ? "insalubre para grupos sensíveis" : "insalubre"
+
       const reportText = `
 RELATÓRIO DE QUALIDADE DO AR - ${city}
 Data: ${new Date().toLocaleDateString("pt-BR")}
@@ -36,8 +33,8 @@ Hoje, ${city} apresentou níveis ${quality} de poluição do ar.
 
 INDICADORES PRINCIPAIS
 - PM2.5: ${pm25.toFixed(1)} µg/m³
-- Temperatura: ${current.temperature.toFixed(1)}°C
-- Umidade: ${current.humidity.toFixed(0)}%
+- Temperatura: ${data.current.temperature.toFixed(1)}°C
+- Umidade: ${data.current.humidity.toFixed(0)}%
 
 CLASSIFICAÇÃO
 A qualidade do ar foi classificada como "${quality}".
@@ -54,17 +51,15 @@ ${
 }
 
 ANÁLISE DAS ÚLTIMAS 24 HORAS
-A concentração média de PM2.5 nas últimas 24 horas foi de ${historical.length > 0 ? (historical.reduce((acc: number, item: any) => acc + Number(item.pm25), 0) / historical.length).toFixed(1) : "N/D"} µg/m³.
+A concentração média de PM2.5 nas últimas 24 horas foi de ${(data.historical.reduce((acc: number, item: any) => acc + item.pm25, 0) / data.historical.length).toFixed(1)} µg/m³.
 
 ---
 Relatório gerado automaticamente pelo Dashboard de Qualidade do Ar
       `.trim()
+
       setReport(reportText)
-    } catch(err:any) {
-      setError('Erro ao gerar relatório: '+(err?.message || err))
-    } finally {
       setGenerating(false)
-    }
+    }, 1500)
   }
 
   const downloadReport = () => {
@@ -102,12 +97,6 @@ Relatório gerado automaticamente pelo Dashboard de Qualidade do Ar
             )}
           </div>
         </div>
-
-        {error && (
-          <div className="rounded-lg bg-red-50 p-4 text-red-800">
-            <p className="font-medium">Erro: {error}</p>
-          </div>
-        )}
 
         {report && (
           <div className="rounded-lg bg-muted p-4">

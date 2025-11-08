@@ -9,50 +9,106 @@ import { CityComparison } from "@/components/city-comparison"
 import { ReportGenerator } from "@/components/report-generator"
 import { Button } from "@/components/ui/button"
 import { RefreshCw, Wind } from "lucide-react"
-import { getCurrentCityData, getCityHistory } from "../lib/api"
-
-const CIDADE_PARA_ESTADO: Record<string, string> = {
-  "São Paulo": "São Paulo",
-  "Rio de Janeiro": "Rio de Janeiro",
-  "Curitiba": "Parana",
-  "Porto Alegre": "Rio Grande do Sul",
-};
 
 export default function AirQualityDashboard() {
   const [selectedCity, setSelectedCity] = useState("São Paulo")
+  // List of cities (can be loaded from backend). Kept default values for now.
+  const [cities, setCities] = useState<string[]>([
+    "São Paulo",
+    "Rio de Janeiro",
+    "Belo Horizonte",
+    "Brasília",
+    "Curitiba",
+    "Porto Alegre",
+    "Salvador",
+    "Fortaleza",
+  ])
   const [airQualityData, setAirQualityData] = useState<any>(null)
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string|null>(null)
 
-  const fetchAirQualityData = async (city = selectedCity) => {
+  // Example: how to load cities from a local backend (commented out until backend is ready)
+  /*
+  useEffect(() => {
+    async function loadCities() {
+      try {
+        const res = await fetch('http://localhost:8000/cities')
+        if (!res.ok) throw new Error('Failed to fetch cities')
+        const data = await res.json()
+        setCities(data)
+      } catch (err) {
+        console.error('Error loading cities:', err)
+      }
+    }
+    loadCities()
+  }, [])
+  */
+
+  const fetchAirQualityData = async () => {
     setLoading(true)
-    setError(null)
+    // Real backend calls (commented) - replace endpoints as necessary
+    /*
     try {
-      // Primeiro busca o histórico p/ extrair estado correto
-      const historyResp = await getCityHistory(city, 24)
-      let estado = (historyResp.data && historyResp.data[0]?.state) || CIDADE_PARA_ESTADO[city] || ""
-      // Busque os dados atuais apenas se o estado está preenchido
-      const current = estado ? await getCurrentCityData(city, estado, "Brazil") : { pm25: undefined, temperature: undefined, humidity: undefined }
+      const currentRes = await fetch(`http://localhost:8000/cities/${encodeURIComponent(selectedCity)}/current`)
+      const current = await currentRes.json()
+
+      const tempRes = await fetch(`http://localhost:8000/cities/${encodeURIComponent(selectedCity)}/temperature/24h`)
+      const temperatures = await tempRes.json() // expected: [{ timestamp, value | temperature }, ...]
+
+      const pmRes = await fetch(`http://localhost:8000/cities/${encodeURIComponent(selectedCity)}/pm25/24h`)
+      const pm25 = await pmRes.json() // expected: [{ timestamp, value | pm25 }, ...]
+
+      // Merge temperature and pm25 arrays into the historical format used by TimeSeriesCharts
+      const historical = (temperatures || []).map((t: any, i: number) => ({
+        timestamp: t.timestamp ?? pm25?.[i]?.timestamp,
+        temperature: t.value ?? t.temperature,
+        pm25: pm25?.[i]?.value ?? pm25?.[i]?.pm25,
+      }))
+
       setAirQualityData({
-        city,
-        current: current, // já está {pm25, temperature, humidity, ...}
-        historical: (historyResp.data || []).map((d:any) => ({
-          timestamp: d.timestamp, 
-          pm25: Number(d.pm25), 
-          temperature: Number(d.temperature)
-        }))
+        city: selectedCity,
+        current,
+        historical,
       })
-    } catch(err:any) {
-      setError("Erro ao carregar dados da cidade: "+(err?.message || err))
-      setAirQualityData(null)
+    } catch (err) {
+      console.error('Error fetching air quality data:', err)
     } finally {
       setLoading(false)
     }
+    return
+    */
+    // Simulating API call - replace with actual backend endpoint
+    setTimeout(() => {
+      setAirQualityData({
+        city: selectedCity,
+        current: {
+          pm25: Math.random() * 100,
+          temperature: 20 + Math.random() * 15,
+          humidity: 40 + Math.random() * 40,
+          timestamp: new Date().toISOString(),
+        },
+        historical: generateHistoricalData(),
+      })
+      setLoading(false)
+    }, 1000)
   }
 
   useEffect(() => {
-    fetchAirQualityData(selectedCity)
+    fetchAirQualityData()
   }, [selectedCity])
+
+  const generateHistoricalData = () => {
+    const data = []
+    for (let i = 23; i >= 0; i--) {
+      const date = new Date()
+      date.setHours(date.getHours() - i)
+      data.push({
+        timestamp: date.toISOString(),
+        pm25: 20 + Math.random() * 60,
+        temperature: 18 + Math.random() * 12,
+      })
+    }
+    return data
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -68,7 +124,7 @@ export default function AirQualityDashboard() {
                 <p className="text-sm text-muted-foreground">Monitoramento em tempo real</p>
               </div>
             </div>
-            <Button onClick={() => fetchAirQualityData(selectedCity)} disabled={loading} variant="outline" size="sm">
+            <Button onClick={fetchAirQualityData} disabled={loading} variant="outline" size="sm">
               <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
               Atualizar dados
             </Button>
@@ -78,16 +134,18 @@ export default function AirQualityDashboard() {
 
       <main className="container mx-auto px-4 py-8">
         <div className="space-y-8">
-          <CitySelector selectedCity={selectedCity} onCityChange={setSelectedCity} />
-          {error && (<div className="p-4 text-red-600 bg-red-50 rounded">{error}</div>)}
-          {loading && (<div className="p-4">Carregando dados da cidade...</div>)}
+          <CitySelector selectedCity={selectedCity} onCityChange={setSelectedCity} cities={cities} />
 
-          {airQualityData && !loading && (
+          {airQualityData && (
             <>
               <HealthAlert data={airQualityData.current} />
+
               <AirQualityIndicators data={airQualityData.current} />
+
               <TimeSeriesCharts data={airQualityData.historical} />
-              <CityComparison currentCity={selectedCity} />
+
+              <CityComparison currentCity={selectedCity} currentPm25={airQualityData.current?.pm25} />
+
               <ReportGenerator city={selectedCity} data={airQualityData} />
             </>
           )}
