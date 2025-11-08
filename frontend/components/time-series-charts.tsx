@@ -17,17 +17,10 @@ export function TimeSeriesCharts({ data }: TimeSeriesChartsProps) {
     return date.getHours().toString().padStart(2, "0") + ":00"
   }
 
-  // Ensure values are numbers (or null) so Recharts can render correctly.
-  // Recharts will break lines when values are undefined; using `null` with `connectNulls` fixes that.
-  const toNumberOrNull = (v: any) => {
-    const n = Number(v)
-    return Number.isFinite(n) ? n : null
-  }
-
   const chartData = data.map((item) => ({
     time: formatTime(item.timestamp),
-    pm25: toNumberOrNull(item.pm25),
-    temperature: toNumberOrNull(item.temperature),
+    pm25: item.pm25,
+    temperature: item.temperature,
   }))
 
   return (
@@ -54,16 +47,7 @@ export function TimeSeriesCharts({ data }: TimeSeriesChartsProps) {
                   borderRadius: "8px",
                 }}
               />
-              <Line
-                type="monotone"
-                dataKey="pm25"
-                // light grey connecting line
-                stroke="#e5e7eb"
-                strokeWidth={2}
-                connectNulls
-                // keep individual dots colored to the series
-                dot={{ r: 3, stroke: 'hsl(var(--primary))', fill: 'hsl(var(--primary))' }}
-              />
+              <Line type="monotone" dataKey="pm25" stroke="hsl(var(--primary))" strokeWidth={2} dot={false} />
             </LineChart>
           </ResponsiveContainer>
         </div>
@@ -91,15 +75,7 @@ export function TimeSeriesCharts({ data }: TimeSeriesChartsProps) {
                   borderRadius: "8px",
                 }}
               />
-              <Line
-                type="monotone"
-                dataKey="temperature"
-                // light grey connecting line
-                stroke="#e5e7eb"
-                strokeWidth={2}
-                connectNulls
-                dot={{ r: 3, stroke: 'hsl(var(--chart-2))', fill: 'hsl(var(--chart-2))' }}
-              />
+              <Line type="monotone" dataKey="temperature" stroke="hsl(var(--chart-2))" strokeWidth={2} dot={false} />
             </LineChart>
           </ResponsiveContainer>
         </div>
