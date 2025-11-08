@@ -47,7 +47,19 @@ export async function getCityPM25_24h(city: string, state: string, country: stri
 }
 
 // Poluição completa 24h
+// Poluição completa 24h (VERSÃO CORRIGIDA)
 export async function getCityPollution24h(city: string, state: string, country: string) {
+  
+  // 1. VOLTAMOS para a URL original que você provou que funciona
   const res = await fetch(`${API_BASE_URL}/cities/${encodeURIComponent(city)}/pollution/24h?state=${encodeURIComponent(state)}&country=${encodeURIComponent(country)}`);
+
+  // 2. Mantemos a verificação de erro (isso é bom)
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => null);
+    const errorMessage = errorData?.detail || `Erro na API: ${res.status} ${res.statusText}`;
+    throw new Error(errorMessage);
+  }
+
+  // 3. Retorna o OBJETO JSON inteiro (ex: { city: "...", data: [...] })
   return res.json();
 }

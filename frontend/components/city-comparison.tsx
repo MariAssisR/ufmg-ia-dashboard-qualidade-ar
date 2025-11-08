@@ -13,6 +13,7 @@ export function CityComparison({ currentCity }: CityComparisonProps) {
   const [comparisonData, setComparisonData] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string|null>(null)
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null)
 
   useEffect(() => {
     setLoading(true)
@@ -75,11 +76,28 @@ export function CityComparison({ currentCity }: CityComparisonProps) {
                 border: "1px solid hsl(var(--border))",
                 borderRadius: "8px",
               }}
+              // force tooltip text to be black for better contrast on hover
+              itemStyle={{ color: "#000" }}
+              labelStyle={{ color: "#000" }}
             />
-            <Bar dataKey="pm25" radius={[8, 8, 0, 0]}>
-              {comparisonData.map((entry, index) => (
-                <Cell key={`cell-${index}`} fill={entry.city === currentCity ? "hsl(var(--primary))" : entry.color} />
-              ))}
+            {/* Use a light gray base fill for bars so tooltip text (black) is readable; highlight current city */}
+            <Bar
+              dataKey="pm25"
+              radius={[8, 8, 0, 0]}
+              // default fill is light gray; we'll change individual cells below and highlight on hover
+              fill="#e5e7eb"
+              onMouseEnter={(_data: any, index: number) => setHoveredIndex(index)}
+              onMouseLeave={() => setHoveredIndex(null)}
+            >
+              {comparisonData.map((entry, index) => {
+                const isCurrent = entry.city === currentCity
+                const isHovered = index === hoveredIndex
+                const fillColor = isCurrent ? "#7a9deb" : "#e5e7eb"
+                const strokeColor = isCurrent ? "#cbd5e1" : "#cbd5e1"
+                return (
+                  <Cell key={`cell-${index}`} fill={fillColor} stroke={strokeColor} />
+                )
+              })}
             </Bar>
           </BarChart>
         </ResponsiveContainer>
