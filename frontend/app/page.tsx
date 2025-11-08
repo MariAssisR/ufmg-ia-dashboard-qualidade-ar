@@ -37,9 +37,10 @@ export default function AirQualityDashboard() {
         city,
         current: current, // já está {pm25, temperature, humidity, ...}
         historical: (historyResp.data || []).map((d:any) => ({
-          timestamp: d.timestamp, 
-          pm25: Number(d.pm25), 
-          temperature: Number(d.temperature)
+          timestamp: d.timestamp,
+          pm25: Number(d.pm25),
+          temperature: Number(d.temperature),
+          state: d.state
         }))
       })
     } catch(err:any) {

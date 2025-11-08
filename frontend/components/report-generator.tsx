@@ -11,7 +11,7 @@ interface ReportGeneratorProps {
   data: any
 }
 
-export function ReportGenerator({ city }: ReportGeneratorProps) {
+export function ReportGenerator({ city, data }: ReportGeneratorProps) {
   const [generating, setGenerating] = useState(false)
   const [report, setReport] = useState<string | null>(null)
   const [error, setError] = useState<string|null>(null)
@@ -20,12 +20,51 @@ export function ReportGenerator({ city }: ReportGeneratorProps) {
     setGenerating(true)
     setError(null)
     try {
-      const current = await getCurrentCityData(city, "", "Brazil")
-      const historicalResp = await getCityHistory(city, 24)
-      const historical = historicalResp.data || []
+      const current = data?.current || {}
+      const historical = data?.historical || []
+
+      const formatNumber = (value: any, digits = 1) => {
+        const num = Number(value)
+        return isFinite(num) ? num.toFixed(digits) : "N/D"
+      }
+
       const pm25 = current.pm25
+      const temperature = current.temperature
+      const humidity = current.humidity
+
       const quality =
-        pm25 <= 12 ? "boa" : pm25 <= 35 ? "moderada" : pm25 <= 55 ? "insalubre para grupos sensíveis" : "insalubre"
+        typeof pm25 === "number" && isFinite(pm25)
+          ? pm25 <= 12
+            ? "boa"
+            : pm25 <= 35
+            ? "moderada"
+            : pm25 <= 55
+            ? "insalubre para grupos sensíveis"
+            : "insalubre"
+          : "desconhecida"
+
+      // Média PM2.5 das últimas 24h
+      let pm25Media = "N/D"
+      if (historical.length > 0) {
+        const validPm25 = historical.map((item: any) => Number(item.pm25)).filter((v: number) => isFinite(v))
+        if (validPm25.length > 0) {
+          pm25Media = (validPm25.reduce((acc: number, v: number) => acc + v, 0) / validPm25.length).toFixed(1)
+        }
+      }
+
+      let recomendacao = "Dados insuficientes para recomendação."
+      if (typeof pm25 === "number" && isFinite(pm25)) {
+        if (pm25 > 55) {
+          recomendacao = "⚠️ Evite atividades ao ar livre. Mantenha janelas fechadas."
+        } else if (pm25 > 35) {
+          recomendacao = "⚠️ Grupos sensíveis devem limitar atividades ao ar livre."
+        } else if (pm25 > 12) {
+          recomendacao = "ℹ️ Qualidade do ar aceitável para a maioria das pessoas."
+        } else {
+          recomendacao = "✓ Qualidade do ar excelente. Aproveite atividades ao ar livre."
+        }
+      }
+
       const reportText = `
 RELATÓRIO DE QUALIDADE DO AR - ${city}
 Data: ${new Date().toLocaleDateString("pt-BR")}
@@ -35,26 +74,18 @@ RESUMO EXECUTIVO
 Hoje, ${city} apresentou níveis ${quality} de poluição do ar.
 
 INDICADORES PRINCIPAIS
-- PM2.5: ${pm25.toFixed(1)} µg/m³
-- Temperatura: ${current.temperature.toFixed(1)}°C
-- Umidade: ${current.humidity.toFixed(0)}%
+- PM2.5: ${formatNumber(pm25, 1)} µg/m³
+- Temperatura: ${formatNumber(temperature, 1)}°C
+- Umidade: ${formatNumber(humidity, 0)}%
 
 CLASSIFICAÇÃO
 A qualidade do ar foi classificada como "${quality}".
 
 RECOMENDAÇÕES
-${
-  pm25 > 55
-    ? "⚠️ Evite atividades ao ar livre. Mantenha janelas fechadas."
-    : pm25 > 35
-      ? "⚠️ Grupos sensíveis devem limitar atividades ao ar livre."
-      : pm25 > 12
-        ? "ℹ️ Qualidade do ar aceitável para a maioria das pessoas."
-        : "✓ Qualidade do ar excelente. Aproveite atividades ao ar livre."
-}
+${recomendacao}
 
 ANÁLISE DAS ÚLTIMAS 24 HORAS
-A concentração média de PM2.5 nas últimas 24 horas foi de ${historical.length > 0 ? (historical.reduce((acc: number, item: any) => acc + Number(item.pm25), 0) / historical.length).toFixed(1) : "N/D"} µg/m³.
+A concentração média de PM2.5 nas últimas 24 horas foi de ${pm25Media} µg/m³.
 
 ---
 Relatório gerado automaticamente pelo Dashboard de Qualidade do Ar
