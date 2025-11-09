@@ -382,8 +382,8 @@ def test_integration_save_and_read_csv(temp_csv_file, monkeypatch):
     
     test_data = {
         "timestamp": datetime.now(timezone.utc).isoformat(),
-        "city": "Curitiba",
-        "state": "Parana",
+        "city": "Fortaleza",
+        "state": "Ceará",
         "country": "Brazil",
         "pm25": "20.0",
         "temperature": "24.0",
@@ -395,10 +395,10 @@ def test_integration_save_and_read_csv(temp_csv_file, monkeypatch):
     save_to_csv(test_data)
     
     # Lê
-    result = read_from_csv(city="Curitiba")
+    result = read_from_csv(city="Fortaleza")
     
     assert len(result) == 1
-    assert result[0]["city"] == "Curitiba"
+    assert result[0]["city"] == "Fortaleza"
     assert result[0]["pm25"] == "20.0"
     assert result[0]["aqi"] == "40"
 

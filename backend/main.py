@@ -93,7 +93,7 @@ def read_from_csv(city: str = None, hours: int = 24):
 CITIES_TO_COLLECT = [
   {"city": "São Paulo", "state": "São Paulo", "country": "Brazil"},
   {"city": "Rio de Janeiro", "state": "Rio de Janeiro", "country": "Brazil"},
-  {"city": "Curitiba", "state": "Parana", "country": "Brazil"},
+  {"city": "Fortaleza", "state": "Ceará", "country": "Brazil"},
 ]
 
 async def collect_data_for_all_cities():

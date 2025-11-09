@@ -14,7 +14,7 @@ import { getCurrentCityData, getCityHistory } from "../lib/api"
 const CIDADE_PARA_ESTADO: Record<string, string> = {
   "São Paulo": "São Paulo",
   "Rio de Janeiro": "Rio de Janeiro",
-  "Curitiba": "Parana",
+  "Fortaleza": "Ceará",
   "Porto Alegre": "Rio Grande do Sul",
 };
 
@@ -88,7 +88,7 @@ export default function AirQualityDashboard() {
             <>
               <HealthAlert data={airQualityData.current} />
               <AirQualityIndicators data={airQualityData.current} />
-              <TimeSeriesCharts data={airQualityData.historical} />
+              <TimeSeriesCharts data={airQualityData.historical} city={selectedCity} state={CIDADE_PARA_ESTADO[selectedCity]} country="Brazil" />
               <CityComparison currentCity={selectedCity} />
               <ReportGenerator city={selectedCity} data={airQualityData} />
             </>

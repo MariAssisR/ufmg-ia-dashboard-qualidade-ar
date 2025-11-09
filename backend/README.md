@@ -47,7 +47,7 @@ O script automaticamente:
 🔄 [08:30:00] Iniciando coleta automática...
 ✅ São Paulo: AQI=45, Temp=23°C
 ✅ Rio de Janeiro: AQI=38, Temp=26°C
-✅ Curitiba: AQI=40, Temp=22°C
+✅ Fortaleza: AQI=40, Temp=22°C
 ✅ Coleta concluída!
 
 ✅ Scheduler iniciado! Coletando a cada 5 minutos...
@@ -181,7 +181,7 @@ O backend coleta dados **automaticamente a cada 5 minutos** das cidades configur
 **Cidades coletadas:**
 - São Paulo, SP
 - Rio de Janeiro, RJ
-- Curitiba, PR
+- Fortaleza, CE
 
 ### Adicionar Mais Cidades
 
@@ -190,7 +190,7 @@ Edite `CITIES_TO_COLLECT` em `main.py`:
 ```python
 CITIES_TO_COLLECT = [
   {"city": "São Paulo", "state": "São Paulo", "country": "Brazil"},
-  {"city": "Curitiba", "state": "Parana", "country": "Brazil"},
+  {"city": "Fortaleza", "state": "Ceará", "country": "Brazil"},
   {"city": "Porto Alegre", "state": "Rio Grande do Sul", "country": "Brazil"},
   # Adicione mais...
 ]
