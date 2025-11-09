@@ -26,6 +26,32 @@ dashboard-qualidade-ar/
 
 ### 1. Backend
 
+#### Pré-requisitos:
+
+* Python 3.9+
+* API keys gratuitas: [IQAir](https://www.iqair.com/air-pollution-data-api) e [OpenWeatherMap](https://openweathermap.org/api)
+
+#### Passos:
+
+```bash
+cd backend
+
+# Editar com suas API keys (obrigatório)
+nano .env
+
+# Rodar servidor (cria venv automaticamente)
+./start.sh
+```
+
+O backend ficará disponível em:
+
+```
+http://localhost:8000
+```
+
+Ele coleta dados automaticamente a cada 5 minutos e disponibiliza endpoints REST para o frontend.
+
+**Documentação interativa:** `http://localhost:8000/docs`
 
 ---
 
@@ -58,6 +84,33 @@ Ele consome automaticamente os dados fornecidos pelo backend.
 
 ### Backend
 
+```bash
+cd backend
+pytest mainTest.py -v
+```
+
+**Resultado esperado:** 19/19 testes passando (100% de sucesso)
+
+Os testes cobrem:
+* Validação de endpoints REST
+* Funções de leitura e escrita em CSV
+* Tratamento de erros
+* Integração completa do fluxo de dados
+
+**Importante:** Todos os serviços externos são mockados, então os testes não requerem API keys e não fazem chamadas HTTP reais.
+
+---
+
+### Frontend
+
+Testes do frontend podem ser executados com:
+
+```bash
+cd frontend
+pnpm test
+```
+
+---
 
 
 ## Ferramentas de IA Utilizadas
